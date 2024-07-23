@@ -1,7 +1,7 @@
 [English](README.md) | [日本語](README_JP.md)
 
 # Civitai Downloader
-![image](https://github.com/user-attachments/assets/dd649b35-09c8-48fe-852d-a80d0d8a4ca3)
+![image](https://github.com/user-attachments/assets/a91e16d0-97ad-4d89-943c-247145ed474b)
 
 ## 概要
 Civitaiでモデルをダウンロードする際に、モデルと一緒にプレビュー画像およびメタ情報をダウンロードする拡張機能です。
