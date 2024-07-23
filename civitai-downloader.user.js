@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.1.4
+// @version      1.2.0
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon
 // @match        https://civitai.com/*
@@ -10,7 +10,8 @@
 // @require      https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js
 // @downloadURL  https://github.com/nihedon/civitai-downloader/raw/main/civitai-downloader.user.js
 // @updateURL    https://github.com/nihedon/civitai-downloader/raw/main/civitai-downloader.user.js
-// @grant        none
+// @grant        unsafeWindow
+// @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
 const OPT_IMAGE_FILE_ONLY = true;
@@ -68,6 +69,14 @@ var interval_id = undefined;
         }
         return orgReflect(target, thisArg, args);
     }
+
+    const orgFetch = unsafeWindow.fetch;
+    unsafeWindow.fetch = async (...args) => {
+        if (args && args.length > 0 && args[0].startsWith("/api/trpc/track.addView")) {
+            bind();
+        }
+        return orgFetch(...args);
+    };
 })();
 
 function bind() {
@@ -137,12 +146,17 @@ async function getModelId() {
 }
 
 function downloadAll(modelId) {
-    fetch(API_MODEL_VERSIONS + modelId).then(res => res.json()).then(json => {
-        const modelInfo = json.files.find(f => f.type !== "Training Data");
-        if (modelInfo) {
-            const fileNameBase = modelInfo.name.replace(/\.[^\.]+$/, "");
-            downloadImageFile(json, fileNameBase, 0);
-            downloadMetaFile(json, fileNameBase);
+    GM_xmlhttpRequest({
+        method: "GET",
+        url: API_MODEL_VERSIONS + modelId,
+        onload: function(res) {
+            const json = JSON.parse(res.responseText);
+            const modelInfo = json.files.find(f => f.type !== "Training Data");
+            if (modelInfo) {
+                const fileNameBase = modelInfo.name.replace(/\.[^\.]+$/, "");
+                downloadImageFile(json, fileNameBase, 0);
+                downloadMetaFile(json, fileNameBase);
+            }
         }
     });
 }
@@ -158,8 +172,16 @@ function downloadImageFile(modelVersionInfo, fileNameBase, imgIdx) {
         if (modelVersionInfo.images[imgIdx].width) {
             imgUrl = imgUrl.replace(/\/width=\d+/, '/width=' + modelVersionInfo.images[imgIdx].width);
         }
-        fetch(imgUrl).then(res => res.blob()).then(blob => {
-            download(blob, `${fileNameBase}.preview.${img.type === "image" ? "png" : "mp4"}`);
+        GM_xmlhttpRequest({
+            method: "GET",
+            url: imgUrl,
+            responseType: "arraybuffer",
+            onload: function(res) {
+                const ext = img.type === "image" ? "png" : "mp4";
+                const type = img.type === "image" ? `image/${ext}` : `video/${ext}`;
+                const blob = new Blob([res.response], { type: type });
+                download(blob, `${fileNameBase}.preview.${ext}`);
+            }
         });
     }
 }
