@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
+// @version      1.0.2
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon
 // @match        https://civitai.com/*
@@ -16,34 +16,52 @@
 const OPT_IMAGE_FILE_ONLY = true;
 
 const $ = jQuery;
-const $body = $(document.body);
 
 const API_MODEL_VERSIONS = "https://civitai.com/api/v1/model-versions/";
 const API_MODELS = "https://civitai.com/api/v1/models/";
 
 const INTERVAL = 500;
-const BACKGROUND_STYLE = {
+
+const GRADIENT_STYLE = {
     "background-image": "linear-gradient(45deg, rgb(106, 232, 247) 10%, rgb(54, 153, 219) 25%, rgb(49, 119, 193) 40%, rgb(149, 86, 243) 57%, rgb(131, 26, 176) 75%, rgb(139, 5, 151) 86%)",
-    "box-shadow": "rgba(255, 255, 255, 0.3) 0px 0px 1px 1px inset, rgba(0, 0, 0, 0.8) 0px 1px 2px",
+};
+const BACKGROUND_STYLE = {
+    ...GRADIENT_STYLE,
     "border-width": "0"
+};
+const BACKGROUND_EFFECT_STYLE = {
+    "position": "absolute",
+    "top": "0px",
+    "left": "0px",
+    "width": "100%",
+    "height": "100%",
+    ...GRADIENT_STYLE,
+    "border-width": "0",
+    "filter": "blur(4px)"
 };
 const FOREGROUND_STYLE = {
     "position": "absolute",
-    "background-color": "#000000AA",
+    "top": "0px",
+    "left": "0px",
     "width": "calc(100% - 4px)",
     "height": "calc(100% - 4px)",
-    "top": "2px",
-    "left": "2px",
+    "margin": "2px",
+    "background-color": "#000000AA",
     "border-radius": "4px",
 };
 
 (function() {
     'use strict';
+    const createCssSyntax = (selector, dic) => `${selector} { ${Object.entries(dic).flatMap(kv => kv.join(":")).join(";") + ";"} }`;
+    $('<style>').text(createCssSyntax(".downloader-foreground", FOREGROUND_STYLE)
+                    + createCssSyntax(".downloader-background", BACKGROUND_STYLE)
+                    + createCssSyntax(".downloader-background_effect", BACKGROUND_EFFECT_STYLE)).appendTo(document.head);
+
     setInterval(() => {
         if (!document.location.pathname.startsWith("/models/")) {
             return;
         }
-        $("a:not([data-downloader-binded=true]):not([data-disabled=true])").each((_, link) => {
+        $("a.mantine-Button-root:not([data-downloader-binded=true]):not([data-disabled=true])").each((_, link) => {
             const $link = $(link);
             const dlIcon = $link.find("svg").hasClass("tabler-icon-download");
             const text = $link.text();
@@ -51,8 +69,9 @@ const FOREGROUND_STYLE = {
             if (!dlIcon && text !== "Download") {
                 return;
             }
-            $link.css(BACKGROUND_STYLE);
-            $("<div>").css(FOREGROUND_STYLE).appendTo($link);
+            $link.addClass("downloader-background");
+            $("<div>").addClass("downloader-background_effect").appendTo($link);
+            $("<div>").addClass("downloader-foreground").appendTo($link);
             $link.children().eq(0).css({ "position": "inherit", "z-index": "1000" });
             $link.on("click", () => {
                 const id = getId();
@@ -115,7 +134,7 @@ function downloadMetaFile(modelVersionInfo, fileNameBase) {
 
 function download(blob, fileName) {
     const objectURL = URL.createObjectURL(blob);
-    const $a = $("<a>").attr({ href: objectURL, download: fileName }).appendTo($body);
+    const $a = $("<a>").attr({ href: objectURL, download: fileName }).appendTo($(document.body));
     $a.get(0).click();
     $a.remove();
     URL.revokeObjectURL(objectURL);
