@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.1.1
+// @version      1.1.2
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon
 // @match        https://civitai.com/*
@@ -21,6 +21,8 @@ const API_MODEL_VERSIONS = "https://civitai.com/api/v1/model-versions/";
 const API_MODELS = "https://civitai.com/api/v1/models/";
 
 const INTERVAL = 500;
+
+const ACTIVE_BUTTON_COLOR = "rgb(24, 100, 171)";
 
 const GRADIENT_STYLE = {
     "background-image": "linear-gradient(45deg, rgb(106, 232, 247) 10%, rgb(54, 153, 219) 25%, rgb(49, 119, 193) 40%, rgb(149, 86, 243) 57%, rgb(131, 26, 176) 75%, rgb(139, 5, 151) 86%)",
@@ -61,7 +63,7 @@ var interval_id = undefined;
 
     const orgReflect = Reflect.apply;
     Reflect.apply = (target, thisArg, args) => {
-        if (args && args.length > 0 && args[0].startsWith("/api/trpc/modelVersion.getById")) {
+        if (args && args.length > 0 && args[0].startsWith("/api/trpc/track.addView")) {
             bind();
         }
         return orgReflect(target, thisArg, args);
@@ -73,13 +75,24 @@ function bind() {
         clearInterval(interval_id);
         interval_id = undefined;
     }
-    const mainContents = $(".mantine-ContainerGrid-root");
-    mainContents.find(".downloader-binded").removeClass("downloader-binded");
-    mainContents.find(".downloader-background").removeClass("downloader-background");
-    mainContents.find(".downloader-foreground").remove();
-    mainContents.find(".downloader-background_effect").remove();
+    const $mainContents = $(".mantine-ContainerGrid-root").eq(0);
+    // model version buttons
+    const $modelVersionButtons = $(".mantine-Container-root > .mantine-Stack-root > .mantine-Group-root .mantine-Button-root");
+    $modelVersionButtons.off("click.downloader");
+    $modelVersionButtons.on("click.downloader", e => {
+        let $btn = $(e.target);
+        if (!$btn.hasClass("mantine-Button-root")) {
+            $btn = $btn.closest(".mantine-Button-root");
+        }
+        if ($btn.css("background-color") !== ACTIVE_BUTTON_COLOR) {
+            $mainContents.find(".downloader-binded").removeClass("downloader-binded");
+            $mainContents.find(".downloader-background").removeClass("downloader-background");
+            $mainContents.find(".downloader-foreground").remove();
+            $mainContents.find(".downloader-background_effect").remove();
+        }
+    });
     interval_id = setInterval(() => {
-        mainContents.find(".mantine-Button-root[type=button]:not(.downloader-binded):not([data-disabled=true])").each((_, link) => {
+        $mainContents.find(".mantine-Button-root[type=button]:not(.downloader-binded):not([data-disabled=true])").each((_, link) => {
             const $link = $(link);
             const dlIcon = $link.find("svg").hasClass("tabler-icon-download");
             const text = $link.text();
@@ -91,13 +104,14 @@ function bind() {
             $("<div>").addClass("downloader-background_effect").appendTo($link);
             $("<div>").addClass("downloader-foreground").appendTo($link);
             $link.children().eq(0).css({ "position": "inherit", "z-index": "1000" });
-            $link.on("click", () => {
+            $link.off("click.downloader");
+            $link.on("click.downloader", () => {
                 getModelId().then(modelId => {
                     downloadAll(modelId);
                 });
             });
         });
-        if (mainContents.find(".mantine-Button-root[type=button]:not(.downloader-binded)").length === 0) {
+        if ($mainContents.find(".mantine-Button-root[type=button]:not(.downloader-binded)").length === 0) {
             clearInterval(interval_id);
             interval_id = undefined;
         }
