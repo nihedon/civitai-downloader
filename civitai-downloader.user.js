@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.1.0
+// @version      1.1.1
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon
 // @match        https://civitai.com/*
@@ -73,8 +73,13 @@ function bind() {
         clearInterval(interval_id);
         interval_id = undefined;
     }
+    const mainContents = $(".mantine-ContainerGrid-root");
+    mainContents.find(".downloader-binded").removeClass("downloader-binded");
+    mainContents.find(".downloader-background").removeClass("downloader-background");
+    mainContents.find(".downloader-foreground").remove();
+    mainContents.find(".downloader-background_effect").remove();
     interval_id = setInterval(() => {
-        $(".mantine-Button-root[type=button]:not(.downloader-binded):not([data-disabled=true])").each((_, link) => {
+        mainContents.find(".mantine-Button-root[type=button]:not(.downloader-binded):not([data-disabled=true])").each((_, link) => {
             const $link = $(link);
             const dlIcon = $link.find("svg").hasClass("tabler-icon-download");
             const text = $link.text();
@@ -92,7 +97,7 @@ function bind() {
                 });
             });
         });
-        if ($(".mantine-Button-root[type=button]:not(.downloader-binded)").length === 0) {
+        if (mainContents.find(".mantine-Button-root[type=button]:not(.downloader-binded)").length === 0) {
             clearInterval(interval_id);
             interval_id = undefined;
         }
