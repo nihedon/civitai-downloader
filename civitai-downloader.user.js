@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.1.3
+// @version      1.1.4
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon
 // @match        https://civitai.com/*
@@ -21,8 +21,6 @@ const API_MODEL_VERSIONS = "https://civitai.com/api/v1/model-versions/";
 const API_MODELS = "https://civitai.com/api/v1/models/";
 
 const INTERVAL = 500;
-
-const ACTIVE_BUTTON_COLOR = "rgb(24, 100, 171)";
 
 const GRADIENT_STYLE = {
     "background-image": "linear-gradient(45deg, rgb(106, 232, 247) 10%, rgb(54, 153, 219) 25%, rgb(49, 119, 193) 40%, rgb(149, 86, 243) 57%, rgb(131, 26, 176) 75%, rgb(139, 5, 151) 86%)",
@@ -86,7 +84,9 @@ function bind() {
         if (!$btn.hasClass("mantine-Button-root")) {
             $btn = $btn.closest(".mantine-Button-root");
         }
-        if ($btn.css("background-color") !== ACTIVE_BUTTON_COLOR) {
+        const colorCodes = [...$btn.css("background-color").matchAll("\\d+")].map(c => parseInt(c[0]));
+        // If the blue component is greater than 0x80, consider it an active.
+        if (!(colorCodes[0] < 0x80 && colorCodes[1] < 0x80 && colorCodes[2] > 0x80)) {
             $mainContents.find(".downloader-binded").removeClass("downloader-binded");
             $mainContents.find(".downloader-background").removeClass("downloader-background");
             $mainContents.find(".downloader-foreground").remove();
