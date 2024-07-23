@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.1.2
+// @version      1.1.3
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon
 // @match        https://civitai.com/*
@@ -39,7 +39,8 @@ const BACKGROUND_EFFECT_STYLE = {
     "height": "100%",
     ...GRADIENT_STYLE,
     "border-width": "0",
-    "filter": "blur(4px)"
+    "filter": "blur(4px)",
+    "animation": "3s alternate-reverse infinite ease blink"
 };
 const FOREGROUND_STYLE = {
     "position": "absolute",
@@ -59,7 +60,8 @@ var interval_id = undefined;
     const createCssSyntax = (selector, dic) => `${selector} { ${Object.entries(dic).flatMap(kv => kv.join(":")).join(";") + ";"} }`;
     $('<style>').text(createCssSyntax(".downloader-foreground", FOREGROUND_STYLE)
                     + createCssSyntax(".downloader-background", BACKGROUND_STYLE)
-                    + createCssSyntax(".downloader-background_effect", BACKGROUND_EFFECT_STYLE)).appendTo(document.head);
+                    + createCssSyntax(".downloader-background_effect", BACKGROUND_EFFECT_STYLE)
+                    + "@keyframes blink { 0% { opacity: 0; } 100% { opacity: 1; } } ").appendTo(document.head);
 
     const orgReflect = Reflect.apply;
     Reflect.apply = (target, thisArg, args) => {
