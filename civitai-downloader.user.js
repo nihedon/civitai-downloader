@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.0
+// @version      1.2.1
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon
 // @match        https://civitai.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=civitai.com
-// @run-at       document-end
+// @run-at       document-idle
 // @require      https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js
 // @downloadURL  https://github.com/nihedon/civitai-downloader/raw/main/civitai-downloader.user.js
 // @updateURL    https://github.com/nihedon/civitai-downloader/raw/main/civitai-downloader.user.js
@@ -62,14 +62,6 @@ var interval_id = undefined;
                     + createCssSyntax(".downloader-background_effect", BACKGROUND_EFFECT_STYLE)
                     + "@keyframes blink { 0% { opacity: 0; } 100% { opacity: 1; } } ").appendTo(document.head);
 
-    const orgReflect = Reflect.apply;
-    Reflect.apply = (target, thisArg, args) => {
-        if (args && args.length > 0 && args[0].startsWith("/api/trpc/track.addView")) {
-            bind();
-        }
-        return orgReflect(target, thisArg, args);
-    }
-
     const orgFetch = unsafeWindow.fetch;
     unsafeWindow.fetch = async (...args) => {
         if (args && args.length > 0 && args[0].startsWith("/api/trpc/track.addView")) {
@@ -77,6 +69,9 @@ var interval_id = undefined;
         }
         return orgFetch(...args);
     };
+    if (document.location.pathname.match(/^\/models\/\d+\//) !== null) {
+        bind();
+    }
 })();
 
 function bind() {
