@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.2
+// @version      1.2.4
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon
 // @match        https://civitai.com/*
@@ -148,11 +148,14 @@ function downloadAll(modelId) {
             const json = JSON.parse(res.responseText);
             const modelInfo = json.files.find(f => f.type !== "Training Data");
             if (modelInfo) {
-                const description = $(".mantine-ContainerGrid-root").first().find("> :last-child > :last-child > :last-child > :last-child > :last-child > :first-child > :first-child").get(0).innerText;
+                const descriptionDiv = $(".mantine-ContainerGrid-root").first().find("> :last-child > :last-child > :last-child > div:last-of-type > :last-child > :first-child > :first-child").get(0);
+                const description = descriptionDiv ? descriptionDiv.innerText : null;
                 const fileNameBase = modelInfo.name.replace(/\.[^\.]+$/, "");
                 downloadImageFile(json, fileNameBase, 0);
                 downloadMetaFile(json, fileNameBase);
-                downloadDescriptionFile(description, fileNameBase);
+                if (description) {
+                    downloadDescriptionFile(description, fileNameBase);
+                }
             }
         }
     });
