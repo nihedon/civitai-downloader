@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.5
+// @version      1.2.6
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon
 // @match        https://civitai.com/*
@@ -28,7 +28,8 @@ const GRADIENT_STYLE = {
 };
 const BUTTON_STYLE = {
     ...GRADIENT_STYLE,
-    "border-width": "0"
+    "border-width": "0",
+    "position": "relative"
 };
 const BUTTON_BEFORE_STYLE = {
     "content": "''",
@@ -109,11 +110,36 @@ function bind() {
             $link.addClass("downloader-effect");
             $link.children().eq(0).css({ "position": "inherit", "z-index": "1000" });
             $link.off("click.downloader");
-            $link.on("click.downloader", () => {
-                getModelId().then(modelId => {
-                    downloadAll(modelId);
-                });
-            });
+            const allDownloadFunc = async (e) => {
+                if (e.currentTarget.tagName === "BUTTON") {
+                    const $target = $(e.currentTarget);
+                    if ($target.next().attr("id") === "mantine-rm-dropdown") {
+                        return;
+                    }
+                    await new Promise(resolve => {
+                        let interval = setInterval(() => {
+                            if ($target.next().hasClass("mantine-Menu-dropdown")) {
+                                resolve();
+                                clearInterval(interval);
+                            }
+                        }, 10)
+                    });
+                    const $dropdown = $target.next();
+                    $dropdown.find("a").each((_, a) => {
+                        const $a = $(a);
+                        $a.addClass("downloader-effect");
+                        $a.children().each((_, div) => $(div).css({ "z-index": "100" }));
+                        $a.on("click.downloader", allDownloadFunc);
+                    });
+                    $dropdown.children().eq(0).css({ "display": "flex", "flex-direction": "column", "row-gap": "3px" });
+                    console.info($dropdown);
+                } else {
+                    getModelId().then(modelId => {
+                        downloadAll(modelId);
+                    });
+                }
+            }
+            $link.on("click.downloader", allDownloadFunc);
         });
         if ($mainContents.find(".mantine-Button-root[type=button]:not(.downloader-binded)").length === 0) {
             clearInterval(interval_id);
