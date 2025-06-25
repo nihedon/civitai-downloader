@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.7
+// @version      1.2.8
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon
 // @match        https://civitai.com/*
@@ -34,7 +34,7 @@ const BUTTON_STYLE = {
 const BUTTON_BEFORE_STYLE = {
     "content": "''",
     "position": "absolute",
-    "top": "0px",
+    "top": "36px",
     "left": "0px",
     "width": "100%",
     "height": "100%",
@@ -77,14 +77,18 @@ var interval_id = undefined;
     }
 })();
 
+var mainContentsSelector = "main > div:nth-child(2) > div:nth-child(1) > div:nth-of-type(3) > div:nth-child(1) > div:nth-child(1)";
+
+var modelVersionButtonsSelector = ".mantine-Container-root > .mantine-Stack-root > .mantine-Group-root .mantine-Button-root";
+
 function bind() {
     if (interval_id !== undefined) {
         clearInterval(interval_id);
         interval_id = undefined;
     }
-    const $mainContents = $(".mantine-ContainerGrid-root").eq(0);
+    const $mainContents = $(mainContentsSelector);
     // model version buttons
-    const $modelVersionButtons = $(".mantine-Container-root > .mantine-Stack-root > .mantine-Group-root .mantine-Button-root");
+    const $modelVersionButtons = $(modelVersionButtonsSelector);
     $modelVersionButtons.off("click.downloader");
     $modelVersionButtons.on("click.downloader", e => {
         let $btn = $(e.target);
@@ -99,7 +103,7 @@ function bind() {
         }
     });
     interval_id = setInterval(() => {
-        $mainContents.find(".mantine-Button-root[type=button]:not(.downloader-binded):not([data-disabled=true])").each((_, link) => {
+        $mainContents.find("[data-tour='model:download']:not(.downloader-binded):not([data-disabled=true])").each((_, link) => {
             const $link = $(link);
             const dlIcon = $link.find("svg").hasClass("tabler-icon-download");
             const text = $link.text();
@@ -157,7 +161,7 @@ function bind() {
             }
             $link.on("click.downloader", allDownloadFunc);
         });
-        if ($mainContents.find(".mantine-Button-root[type=button]:not(.downloader-binded)").length === 0) {
+        if ($mainContents.find("[data-tour='model:download']:not(.downloader-binded)").length === 0) {
             clearInterval(interval_id);
             interval_id = undefined;
         }
@@ -188,7 +192,7 @@ function downloadAll(modelId) {
             const json = JSON.parse(res.responseText);
             const modelInfo = json.files.find(f => f.type !== "Training Data");
             if (modelInfo) {
-                const descriptionDiv = $(".mantine-ContainerGrid-root").first().find("> :last-child > :last-child > :last-child > div:last-of-type > :last-child > :first-child > :first-child").get(0);
+                const descriptionDiv = $(mainContentsSelector).find("div[class*=ModelVersionDetails_mainSection] div[class*=TypographyStylesWrapper_root]").get(0);
                 const description = descriptionDiv ? descriptionDiv.innerText : null;
                 const fileNameBase = modelInfo.name.replace(/\.[^\.]+$/, "");
                 downloadImageFile(json, fileNameBase, 0);
