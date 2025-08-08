@@ -34,6 +34,7 @@ const BUTTON_STYLE = {
 const BUTTON_BEFORE_STYLE = {
     "content": "''",
     "position": "absolute",
+    "top": "36px",
     "left": "0px",
     "width": "100%",
     "height": "100%",
