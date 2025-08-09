@@ -29,12 +29,13 @@ const GRADIENT_STYLE = {
 const BUTTON_STYLE = {
     ...GRADIENT_STYLE,
     "border-width": "0",
-    "position": "relative"
+    "position": "relative",
+    "overflow": "initial"
 };
 const BUTTON_BEFORE_STYLE = {
     "content": "''",
     "position": "absolute",
-    "top": "36px",
+    "top": "100%",
     "left": "0px",
     "width": "100%",
     "height": "100%",
@@ -62,6 +63,7 @@ var interval_id = undefined;
     const createCssSyntax = (selector, dic) => `${selector} { ${Object.entries(dic).flatMap(kv => kv.join(":")).join(";") + ";"} }`;
     $('<style>').text(createCssSyntax(".downloader-effect", BUTTON_STYLE)
                     + createCssSyntax(".downloader-effect::before", BUTTON_BEFORE_STYLE)
+                    + createCssSyntax(".mantine-Menu-dropdown > .mantine-Menu-item.downloader-effect::before", {top: "0px"})
                     + createCssSyntax(".downloader-effect::after", BUTTON_AFTER_STYLE)
                     + "@keyframes blink { 0% { opacity: 0; } 100% { opacity: 1; } } ").appendTo(document.head);
 
