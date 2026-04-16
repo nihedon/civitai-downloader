@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.10
+// @version      1.2.11
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon
 // @match        https://civitai.com/*
 // @match        https://civitai.green/*
+// @match        https://civitai.red/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=civitai.com
 // @run-at       document-idle
 // @require      https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js
