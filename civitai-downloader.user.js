@@ -7,6 +7,9 @@
 // @match        https://civitai.com/*
 // @match        https://civitai.green/*
 // @match        https://civitai.red/*
+// @connect      civitai.com
+// @connect      civitai.green
+// @connect      civitai.red
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=civitai.com
 // @run-at       document-idle
 // @require      https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js
