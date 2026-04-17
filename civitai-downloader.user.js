@@ -10,8 +10,8 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=civitai.com
 // @run-at       document-idle
 // @require      https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js
-// @downloadURL  https://github.com/abel1502/civitai-downloader/raw/main/civitai-downloader.user.js
-// @updateURL    https://github.com/abel1502/civitai-downloader/raw/main/civitai-downloader.user.js
+// @downloadURL  https://github.com/nihedon/civitai-downloader/raw/main/civitai-downloader.user.js
+// @updateURL    https://github.com/nihedon/civitai-downloader/raw/main/civitai-downloader.user.js
 // @grant        unsafeWindow
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
