@@ -3,20 +3,22 @@
 // @namespace    http://tampermonkey.net/
 // @version      1.2.11
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
-// @author       nihedon
+// @author       nihedon, abel1502
 // @match        https://civitai.com/*
 // @match        https://civitai.green/*
 // @match        https://civitai.red/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=civitai.com
 // @run-at       document-idle
 // @require      https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js
-// @downloadURL  https://github.com/nihedon/civitai-downloader/raw/main/civitai-downloader.user.js
-// @updateURL    https://github.com/nihedon/civitai-downloader/raw/main/civitai-downloader.user.js
+// @downloadURL  https://github.com/abel1502/civitai-downloader/raw/main/civitai-downloader.user.js
+// @updateURL    https://github.com/abel1502/civitai-downloader/raw/main/civitai-downloader.user.js
 // @grant        unsafeWindow
 // @grant        GM_xmlhttpRequest
+// @grant        GM_download
 // ==/UserScript==
 
 const OPT_IMAGE_FILE_ONLY = true;
+const OPT_DESCRIPTION_TXT = false;
 
 const $ = jQuery;
 
@@ -287,29 +289,14 @@ function bind() {
                     $dropdown.children().eq(0).css({ "display": "flex", "flex-direction": "column", "row-gap": "3px" });
                     console.info($dropdown);
                 } else {
-                    await waitForRedirect();
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const modelUrl = e.currentTarget.href;
                     getModelId().then((modelId) => {
-                        downloadAll(modelId);
+                        downloadAll(modelId, modelUrl);
                     });
                 }
             };
-            async function waitForRedirect() {
-                let modelToast = showToast("Preparing model download...", "progress");
-                return new Promise((resolve) => {
-                    const checkRedirect = async () => {
-                        try {
-                            const res = await fetch(document.location.href, { method: "HEAD" });
-                            if (res.ok) {
-                                updateToast(modelToast, "Model download started", "success");
-                                resolve();
-                            }
-                        } catch (e) {
-                            setTimeout(checkRedirect, 100);
-                        }
-                    };
-                    checkRedirect();
-                });
-            }
             $link.on("click.downloader", allDownloadFunc);
         });
         if ($mainContents.find("[data-tour='model:download']:not(.downloader-binded)").length === 0) {
@@ -335,7 +322,7 @@ async function getModelId() {
     return json.modelVersions[0].id;
 }
 
-function downloadAll(modelId) {
+function downloadAll(modelId, modelUrl) {
     const metaInfoToast = showToast(`Fetching metadata...`, "progress");
     GM_xmlhttpRequest({
         method: "GET",
@@ -347,12 +334,13 @@ function downloadAll(modelId) {
                 const descriptionDiv = $(mainContentsSelector).find("div[class*=ModelVersionDetails_mainSection] div[class*=TypographyStylesWrapper_root]").get(0);
                 const description = descriptionDiv ? descriptionDiv.innerText : null;
                 const fileNameBase = modelInfo.name.replace(/\.[^\.]+$/, "");
+                downloadModelFile(modelUrl, fileNameBase, modelInfo.name);
                 downloadMetaFile(json, fileNameBase);
-                updateToast(metaInfoToast, `${fileNameBase}.civitai.info download started`, "success");
+                updateToast(metaInfoToast, `${fileNameBase}.civitai.info downloaded`, "success");
                 downloadImageFile(json, fileNameBase, 0);
-                if (description) {
+                if (OPT_DESCRIPTION_TXT && description) {
                     downloadDescriptionFile(description, fileNameBase);
-                    showToast(`${fileNameBase}.description.txt download started`, "success");
+                    showToast(`${fileNameBase}.description.txt downloaded`, "success");
                 }
             } else {
                 updateToast(metaInfoToast, "No downloadable file found.", "info");
@@ -361,6 +349,25 @@ function downloadAll(modelId) {
         onerror: function (err) {
             console.error("Model version fetch failed", err);
             updateToast(metaInfoToast, "Failed to fetch metadata.", "error");
+        },
+    });
+}
+
+function downloadModelFile(modelUrl, fileNameBase, modelFileName) {
+    const modelToast = showToast(`Preparing ${modelFileName}...`, "progress");
+    GM_download({
+        url: modelUrl,
+        name: `${fileNameBase}/${modelFileName}`,
+        saveAs: false,
+        onload: function () {
+            updateToast(modelToast, `${modelFileName} downloaded`, "success");
+        },
+        onerror: function (err) {
+            console.error("Model download failed", err);
+            updateToast(modelToast, `Failed to fetch ${modelFileName}`, "error");
+        },
+        ontimeout: function () {
+            updateToast(modelToast, `Timed out downloading ${modelFileName}`, "error");
         },
     });
 }
@@ -385,8 +392,8 @@ function downloadImageFile(modelVersionInfo, fileNameBase, imgIdx) {
                 const ext = img.type === "image" ? "png" : "mp4";
                 const type = img.type === "image" ? `image/${ext}` : `video/${ext}`;
                 const blob = new Blob([res.response], { type: type });
-                download(blob, `${fileNameBase}.preview.${ext}`);
-                updateToast(previewToast, `${fileNameBase}.preview.${ext} download started`, "success");
+                download(blob, `${fileNameBase}/${fileNameBase}.preview.${ext}`);
+                updateToast(previewToast, `${fileNameBase}.preview.${ext} downloaded`, "success");
             },
             onerror: function (err) {
                 console.error("Preview download failed", err);
@@ -401,18 +408,26 @@ function downloadImageFile(modelVersionInfo, fileNameBase, imgIdx) {
 function downloadMetaFile(modelVersionInfo, fileNameBase) {
     const json = [JSON.stringify(modelVersionInfo, null, 4)];
     const blob = new Blob(json, { type: "text/plain" });
-    download(blob, `${fileNameBase}.civitai.info`);
+    download(blob, `${fileNameBase}/${fileNameBase}.civitai.info`);
 }
 
 function downloadDescriptionFile(description, fileNameBase) {
     const blob = new Blob([description], { type: "text/plain" });
-    download(blob, `${fileNameBase}.description.txt`);
+    download(blob, `${fileNameBase}/${fileNameBase}.description.txt`);
 }
 
 function download(blob, fileName) {
     const objectURL = URL.createObjectURL(blob);
-    const $a = $("<a>").attr({ href: objectURL, download: fileName }).appendTo($(document.body));
-    $a.get(0).click();
-    $a.remove();
-    URL.revokeObjectURL(objectURL);
+
+    const cleanup = () => {
+        URL.revokeObjectURL(objectURL);
+    };
+
+    GM_download({
+        url: objectURL,
+        name: fileName,
+        onload: cleanup,
+        onerror: cleanup,
+        ontimeout: cleanup,
+    });
 }
