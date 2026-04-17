@@ -18,7 +18,7 @@
 // ==/UserScript==
 
 const OPT_IMAGE_FILE_ONLY = true;
-const OPT_DESCRIPTION_TXT = false;
+const OPT_DESCRIPTION_TXT = true;
 
 const $ = jQuery;
 
