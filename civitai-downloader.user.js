@@ -20,8 +20,38 @@
 // @grant        GM_download
 // ==/UserScript==
 
-const OPT_IMAGE_FILE_ONLY = true;
-const OPT_DESCRIPTION_TXT = true;
+const OPT_IMAGE_FILE_ONLY_DEFAULT = true;
+const OPT_DESCRIPTION_TXT_DEFAULT = true;
+const OPT_SAVE_TO_SUBFOLDER_DEFAULT = false;
+
+const options = [
+    {
+        key: "image_file_only",
+        label: "Image File Only",
+        default: OPT_IMAGE_FILE_ONLY_DEFAULT,
+    },
+    {
+        key: "description_txt",
+        label: "Description Text",
+        default: OPT_DESCRIPTION_TXT_DEFAULT,
+    },
+    {
+        key: "save_to_subfolder",
+        label: "Save to Subfolder",
+        default: OPT_SAVE_TO_SUBFOLDER_DEFAULT,
+        attention: "Enabling this requires additional Tampermonkey configuration.",
+        help: "https://github.com/nihedon/civitai-downloader/HELP.md",
+    },
+];
+
+function getOption(key, defaultValue) {
+    const val = localStorage.getItem(`civitai_dl_${key}`);
+    return val === null ? defaultValue : val === "true";
+}
+
+function setOption(key, value) {
+    localStorage.setItem(`civitai_dl_${key}`, value);
+}
 
 const $ = jQuery;
 
@@ -114,6 +144,41 @@ const TOAST_ERROR_STYLE = {
 const TOAST_CLOSING_STYLE = {
     "animation": `downloader-toast-out ${TOAST_DEFAULT_EASE_DURATION}ms ease-in forwards`,
 };
+const OPTIONS_BTN_STYLE = {
+    "cursor": "pointer",
+    "display": "flex",
+    "align-items": "center",
+    "justify-content": "center",
+    "width": "30px",
+    "height": "30px",
+    "border-radius": "4px",
+    "transition": "background-color 0.2s",
+    "margin-left": "8px",
+    "color": "var(--mantine-color-text)",
+};
+const OPTIONS_MENU_STYLE = {
+    "position": "absolute",
+    "top": "100%",
+    "right": "0",
+    "background": "var(--mantine-color-dark-6)",
+    "border": "1px solid var(--mantine-color-dark-4)",
+    "border-radius": "8px",
+    "padding": "12px",
+    "z-index": "1000",
+    "display": "none",
+    "box-shadow": "0 8px 16px rgba(0,0,0,0.4)",
+    "min-width": "200px",
+    "flex-direction": "column",
+    "gap": "8px",
+};
+const OPTION_ITEM_STYLE = {
+    "display": "flex",
+    "align-items": "center",
+    "gap": "8px",
+    "cursor": "pointer",
+    "user-select": "none",
+    "font-size": "14px",
+};
 
 var interval_id = undefined;
 
@@ -140,6 +205,11 @@ var interval_id = undefined;
                 createCssSyntax(".downloader-toast.downloader-toast--success", TOAST_SUCCESS_STYLE) +
                 createCssSyntax(".downloader-toast.downloader-toast--error", TOAST_ERROR_STYLE) +
                 createCssSyntax(".downloader-toast.downloader-toast--closing", TOAST_CLOSING_STYLE) +
+                createCssSyntax(".downloader-options-btn", OPTIONS_BTN_STYLE) +
+                createCssSyntax(".downloader-options-btn:hover", { "background-color": "rgba(255,255,255,0.1)" }) +
+                createCssSyntax(".downloader-options-menu", OPTIONS_MENU_STYLE) +
+                createCssSyntax(".downloader-options-menu.show", { "display": "flex" }) +
+                createCssSyntax(".downloader-option-item", OPTION_ITEM_STYLE) +
                 // Keyframes
                 "@keyframes blink { 0% { opacity: 0; } 100% { opacity: 1; } } " +
                 "@keyframes downloader-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } " +
@@ -240,6 +310,9 @@ function bind() {
         clearInterval(interval_id);
         interval_id = undefined;
     }
+
+    addOptionMenu();
+
     const $mainContents = $(mainContentsSelector);
     // model version buttons
     const $modelVersionButtons = $(modelVersionButtonsSelector);
@@ -309,6 +382,49 @@ function bind() {
     }, INTERVAL);
 }
 
+function addOptionMenu() {
+    const $header = $("header > div:eq(1) > div:eq(0)");
+    if ($header.length && $header.find(".downloader-options-container").length === 0) {
+        const $container = $('<div class="downloader-options-container" style="position: relative; display: flex; align-items: center;"></div>');
+        const $optBtn = $('<div class="downloader-options-btn" title="Downloader Settings">⚙</div>');
+        const $menu = $('<div class="downloader-options-menu"></div>');
+
+        options.forEach((opt) => {
+            const isChecked = getOption(opt.key, opt.default);
+            const $item = $(`<label class="downloader-option-item">`);
+            const $input = $(`<input type="checkbox" data-key="${opt.key}" ${isChecked ? "checked" : ""}>`);
+            const $label = $(`<span>${opt.label}</span>`);
+            $item.append($input).append($label);
+            if (opt.attention) {
+                const $attention = $(`<span style="font-size: 12px; color: #ff922b;" title="${opt.attention}">⚠</span>`);
+                $item.append($attention);
+            }
+            if (opt.help) {
+                const $help = $(`<a href="${opt.help}" target="_blank" rel="noopener noreferrer">[?]</a>`);
+                $item.append($help);
+            }
+            $input.on("change", function () {
+                setOption(opt.key, this.checked);
+            });
+            $menu.append($item);
+        });
+
+        $optBtn.on("click", (e) => {
+            e.stopPropagation();
+            $menu.toggleClass("show");
+        });
+
+        $(document).on("click", (e) => {
+            if (!$(e.target).closest(".downloader-options-container").length) {
+                $menu.removeClass("show");
+            }
+        });
+
+        $container.append($optBtn).append($menu);
+        $header.append($container);
+    }
+}
+
 function getId() {
     return document.location.pathname.split(/[\/\?]/)[2];
 }
@@ -341,7 +457,7 @@ function downloadAll(modelId, modelUrl) {
                 downloadMetaFile(json, fileNameBase);
                 updateToast(metaInfoToast, `${fileNameBase}.civitai.info downloaded`, "success");
                 downloadImageFile(json, fileNameBase, 0);
-                if (OPT_DESCRIPTION_TXT && description) {
+                if (getOption("description_txt", OPT_DESCRIPTION_TXT_DEFAULT) && description) {
                     downloadDescriptionFile(description, fileNameBase);
                     showToast(`${fileNameBase}.description.txt downloaded`, "success");
                 }
@@ -358,18 +474,15 @@ function downloadAll(modelId, modelUrl) {
 
 function downloadModelFile(modelUrl, fileNameBase, modelFileName) {
     const modelToast = showToast(`Preparing ${modelFileName}...`, "progress");
-    GM_download({
-        url: modelUrl,
-        name: `${fileNameBase}/${modelFileName}`,
-        saveAs: false,
-        onload: function () {
+    downloadUrl(modelUrl, fileNameBase, modelFileName, {
+        onload: () => {
             updateToast(modelToast, `${modelFileName} downloaded`, "success");
         },
-        onerror: function (err) {
+        onerror: (err) => {
             console.error("Model download failed", err);
             updateToast(modelToast, `Failed to fetch ${modelFileName}`, "error");
         },
-        ontimeout: function () {
+        ontimeout: () => {
             updateToast(modelToast, `Timed out downloading ${modelFileName}`, "error");
         },
     });
@@ -378,7 +491,7 @@ function downloadModelFile(modelUrl, fileNameBase, modelFileName) {
 function downloadImageFile(modelVersionInfo, fileNameBase, imgIdx) {
     const previewToast = showToast(`Preparing ${fileNameBase}.preview.png...`, "progress");
     let imgs = modelVersionInfo.images;
-    if (OPT_IMAGE_FILE_ONLY) {
+    if (getOption("image_file_only", OPT_IMAGE_FILE_ONLY_DEFAULT)) {
         imgs = imgs.filter((img) => img.type === "image");
     }
     if (imgs.length > 0) {
@@ -395,7 +508,7 @@ function downloadImageFile(modelVersionInfo, fileNameBase, imgIdx) {
                 const ext = img.type === "image" ? "png" : "mp4";
                 const type = img.type === "image" ? `image/${ext}` : `video/${ext}`;
                 const blob = new Blob([res.response], { type: type });
-                download(blob, `${fileNameBase}/${fileNameBase}.preview.${ext}`);
+                downloadBlob(blob, fileNameBase, `${fileNameBase}.preview.${ext}`);
                 updateToast(previewToast, `${fileNameBase}.preview.${ext} downloaded`, "success");
             },
             onerror: function (err) {
@@ -411,26 +524,57 @@ function downloadImageFile(modelVersionInfo, fileNameBase, imgIdx) {
 function downloadMetaFile(modelVersionInfo, fileNameBase) {
     const json = [JSON.stringify(modelVersionInfo, null, 4)];
     const blob = new Blob(json, { type: "text/plain" });
-    download(blob, `${fileNameBase}/${fileNameBase}.civitai.info`);
+    downloadBlob(blob, fileNameBase, `${fileNameBase}.civitai.info`);
 }
 
 function downloadDescriptionFile(description, fileNameBase) {
     const blob = new Blob([description], { type: "text/plain" });
-    download(blob, `${fileNameBase}/${fileNameBase}.description.txt`);
+    downloadBlob(blob, fileNameBase, `${fileNameBase}.description.txt`);
 }
 
-function download(blob, fileName) {
+function downloadBlob(blob, fileNameBase, fileName) {
     const objectURL = URL.createObjectURL(blob);
-
     const cleanup = () => {
         URL.revokeObjectURL(objectURL);
     };
-
-    GM_download({
-        url: objectURL,
-        name: fileName,
+    const callback = {
         onload: cleanup,
         onerror: cleanup,
         ontimeout: cleanup,
+    };
+    downloadUrl(objectURL, fileNameBase, fileName, callback);
+}
+
+function downloadUrl(url, fileNameBase, fileName, callback = () => {}) {
+    if (getOption("save_to_subfolder", OPT_SAVE_TO_SUBFOLDER_DEFAULT)) {
+        downloadGM(url, fileNameBase, fileName, callback);
+    } else {
+        downloadHref(url, fileName, callback.onload || (() => {}));
+    }
+}
+
+function downloadGM(url, fileNameBase, fileName, callback = () => {}) {
+    let downloadFileName;
+    if (getOption("save_to_subfolder", OPT_SAVE_TO_SUBFOLDER_DEFAULT)) {
+        downloadFileName = fileNameBase + "/" + fileName;
+    } else {
+        downloadFileName = fileName;
+    }
+
+    GM_download({
+        url: url,
+        name: downloadFileName,
+        ...callback,
     });
+}
+
+/**
+ * Downloads via temporary link injection.
+ * Used as a fallback when other download managers interfere with GM_download's filename handling.
+ */
+function downloadHref(url, fileName, callback = () => {}) {
+    const $a = $("<a>").attr({ href: url, download: fileName }).appendTo($(document.body));
+    $a.get(0).click();
+    $a.remove();
+    callback();
 }
