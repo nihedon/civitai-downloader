@@ -40,7 +40,7 @@ const options = [
         label: "Save to Subfolder",
         default: OPT_SAVE_TO_SUBFOLDER_DEFAULT,
         attention: "Enabling this requires additional Tampermonkey configuration.",
-        help: "https://github.com/nihedon/civitai-downloader/HELP.md",
+        help: "https://github.com/nihedon/civitai-downloader/blob/main/HELP.md",
     },
 ];
 
