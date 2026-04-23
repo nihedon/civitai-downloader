@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.14
+// @version      1.2.15
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon, abel1502
 // @match        https://civitai.com/*
@@ -137,7 +137,7 @@ const OPTION_ITEM_STYLE = {
     "font-size": "14px",
 };
 
-var interval_id = undefined;
+let intervalId;
 
 const createCssSyntax = (selector, dic) =>
     `${selector} { ${
@@ -189,9 +189,9 @@ var mainContentsSelector = "main > div:nth-child(2) > div:nth-child(1) > div:nth
 var modelVersionButtonsSelector = ".mantine-Container-root > .mantine-Stack-root > .mantine-Group-root .mantine-Button-root";
 
 function bind() {
-    if (interval_id !== undefined) {
-        clearInterval(interval_id);
-        interval_id = undefined;
+    if (intervalId !== undefined) {
+        clearInterval(intervalId);
+        intervalId = undefined;
     }
 
     const $mainContents = $(mainContentsSelector);
@@ -203,14 +203,14 @@ function bind() {
         if (!$btn.hasClass("mantine-Button-root")) {
             $btn = $btn.closest(".mantine-Button-root");
         }
-        const colorCodes = [...$btn.css("background-color").matchAll("\\d+")].map((c) => parseInt(c[0]));
+        const colorCodes = [...$btn.css("background-color").matchAll("\\d+")].map((c) => Number.parseInt(c[0]));
         // If the blue component is greater than 0x80, consider it an active.
         if (!(colorCodes[0] < 0x80 && colorCodes[1] < 0x80 && colorCodes[2] > 0x80)) {
             $mainContents.find(".downloader-binded").removeClass("downloader-binded");
             $mainContents.find(".downloader-effect").removeClass("downloader-effect");
         }
     });
-    interval_id = setInterval(() => {
+    intervalId = setInterval(() => {
         const $downloadButton = $mainContents.find("a[href^='/api/download/models/']").each((_, link) => {
             const $link = $(link);
             const $buttonWrapper = $("<div>").css({
@@ -274,8 +274,8 @@ function bind() {
             $link.on("click.downloader", allDownloadFunc);
         });
         if ($mainContents.find("[data-tour='model:download']:not(.downloader-binded)").length === 0) {
-            clearInterval(interval_id);
-            interval_id = undefined;
+            clearInterval(intervalId);
+            intervalId = undefined;
         }
     }, INTERVAL);
 }
@@ -286,8 +286,8 @@ function createOptionMenu() {
     const $settingsIcon = $("<span>")
         .addClass("material-symbols-outlined settings")
         .css({
-            "font-size": "24px",
-            "color": "#808080B0",
+            "font-size": "20px",
+            "color": "var(--mantine-color-text)",
         })
         .text("settings");
     $optBtn.append($settingsIcon);
@@ -296,7 +296,7 @@ function createOptionMenu() {
     const $tooltip2Icon = $("<span>")
         .addClass("material-symbols-outlined tooltip_2")
         .css({
-            "font-size": "18px",
+            "font-size": "16px",
             "color": "#ff922b",
         })
         .text("tooltip_2");
@@ -304,7 +304,7 @@ function createOptionMenu() {
     const $helpIcon = $("<a>")
         .addClass("material-symbols-outlined help")
         .css({
-            "font-size": "18px",
+            "font-size": "16px",
         })
         .text("help");
 
