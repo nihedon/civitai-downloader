@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.12
+// @version      1.2.13
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon, abel1502
 // @match        https://civitai.com/*
@@ -15,9 +15,12 @@
 // @require      https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js
 // @downloadURL  https://github.com/nihedon/civitai-downloader/raw/main/civitai-downloader.user.js
 // @updateURL    https://github.com/nihedon/civitai-downloader/raw/main/civitai-downloader.user.js
+// @resource     MATERIAL_ICONS https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined
 // @grant        unsafeWindow
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
+// @grant        GM_getResourceText
+// @grant        GM_addStyle
 // ==/UserScript==
 
 const OPT_IMAGE_FILE_ONLY_DEFAULT = true;
@@ -144,6 +147,11 @@ const TOAST_ERROR_STYLE = {
 const TOAST_CLOSING_STYLE = {
     "animation": `downloader-toast-out ${TOAST_DEFAULT_EASE_DURATION}ms ease-in forwards`,
 };
+const OPTIONS_CONTAINER_STYLE = {
+    "position": "relative",
+    "display": "flex",
+    "align-items": "center",
+};
 const OPTIONS_BTN_STYLE = {
     "cursor": "pointer",
     "display": "flex",
@@ -160,14 +168,14 @@ const OPTIONS_MENU_STYLE = {
     "position": "absolute",
     "top": "100%",
     "right": "0",
-    "background": "var(--mantine-color-dark-6)",
+    "background": "var(--mantine-color-body)",
     "border": "1px solid var(--mantine-color-dark-4)",
     "border-radius": "8px",
     "padding": "12px",
     "z-index": "1000",
     "display": "none",
     "box-shadow": "0 8px 16px rgba(0,0,0,0.4)",
-    "min-width": "200px",
+    "min-width": "240px",
     "flex-direction": "column",
     "gap": "8px",
 };
@@ -175,7 +183,6 @@ const OPTION_ITEM_STYLE = {
     "display": "flex",
     "align-items": "center",
     "gap": "8px",
-    "cursor": "pointer",
     "user-select": "none",
     "font-size": "14px",
 };
@@ -184,39 +191,46 @@ var interval_id = undefined;
 
 (function () {
     "use strict";
+
+    const iconCss = GM_getResourceText("MATERIAL_ICONS");
+    GM_addStyle(iconCss.replace("@font-face {", "@font-face { font-display: block;"));
+
     const createCssSyntax = (selector, dic) =>
         `${selector} { ${
             Object.entries(dic)
                 .flatMap((kv) => kv.join(":"))
                 .join(";") + ";"
         } }`;
-    $("<style>")
-        .text(
-            // Download button effects
-            createCssSyntax(".downloader-effect", BUTTON_STYLE) +
-                createCssSyntax(".downloader-effect::before", BUTTON_BEFORE_STYLE) +
-                createCssSyntax(".mantine-Menu-dropdown > .mantine-Menu-item.downloader-effect::before", { "top": "0px" }) +
-                createCssSyntax(".downloader-effect::after", BUTTON_AFTER_STYLE) +
-                // Toast container & items
-                createCssSyntax(".downloader-toast-container", TOAST_CONTAINER_STYLE) +
-                createCssSyntax(".downloader-toast", TOAST_STYLE) +
-                createCssSyntax(".downloader-toast-message", TOAST_MESSAGE_STYLE) +
-                createCssSyntax(".downloader-toast.downloader-toast--progress::before", TOAST_PROGRESS_ANIMATION_STYLE) +
-                createCssSyntax(".downloader-toast.downloader-toast--success", TOAST_SUCCESS_STYLE) +
-                createCssSyntax(".downloader-toast.downloader-toast--error", TOAST_ERROR_STYLE) +
-                createCssSyntax(".downloader-toast.downloader-toast--closing", TOAST_CLOSING_STYLE) +
-                createCssSyntax(".downloader-options-btn", OPTIONS_BTN_STYLE) +
-                createCssSyntax(".downloader-options-btn:hover", { "background-color": "rgba(255,255,255,0.1)" }) +
-                createCssSyntax(".downloader-options-menu", OPTIONS_MENU_STYLE) +
-                createCssSyntax(".downloader-options-menu.show", { "display": "flex" }) +
-                createCssSyntax(".downloader-option-item", OPTION_ITEM_STYLE) +
-                // Keyframes
-                "@keyframes blink { 0% { opacity: 0; } 100% { opacity: 1; } } " +
-                "@keyframes downloader-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } " +
-                "@keyframes downloader-toast-in { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } } " +
-                "@keyframes downloader-toast-out { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-10px); opacity: 0; } } ",
-        )
-        .appendTo(document.head);
+
+    const css =
+        // Download button effects
+        createCssSyntax(".downloader-effect", BUTTON_STYLE) +
+        createCssSyntax(".downloader-effect::before", BUTTON_BEFORE_STYLE) +
+        createCssSyntax(".mantine-Menu-dropdown > .mantine-Menu-item.downloader-effect::before", { "top": "0px" }) +
+        createCssSyntax(".downloader-effect::after", BUTTON_AFTER_STYLE) +
+        // Toast container & items
+        createCssSyntax(".downloader-toast-container", TOAST_CONTAINER_STYLE) +
+        createCssSyntax(".downloader-toast", TOAST_STYLE) +
+        createCssSyntax(".downloader-toast-message", TOAST_MESSAGE_STYLE) +
+        createCssSyntax(".downloader-toast.downloader-toast--progress::before", TOAST_PROGRESS_ANIMATION_STYLE) +
+        createCssSyntax(".downloader-toast.downloader-toast--success", TOAST_SUCCESS_STYLE) +
+        createCssSyntax(".downloader-toast.downloader-toast--error", TOAST_ERROR_STYLE) +
+        createCssSyntax(".downloader-toast.downloader-toast--closing", TOAST_CLOSING_STYLE) +
+        createCssSyntax(".downloader-options-container", OPTIONS_CONTAINER_STYLE) +
+        createCssSyntax(".downloader-options-btn", OPTIONS_BTN_STYLE) +
+        createCssSyntax(".downloader-options-btn:hover", { "background-color": "rgba(255,255,255,0.1)" }) +
+        createCssSyntax(".downloader-options-menu", OPTIONS_MENU_STYLE) +
+        createCssSyntax(".downloader-options-menu.show", { "display": "flex" }) +
+        createCssSyntax(".downloader-option-item", OPTION_ITEM_STYLE) +
+        // Prevent layout shift/FOIT for icons
+        ".material-symbols-outlined { font-display: block; width: 1em; overflow: hidden; }" +
+        // Keyframes
+        "@keyframes blink { 0% { opacity: 0; } 100% { opacity: 1; } } " +
+        "@keyframes downloader-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } " +
+        "@keyframes downloader-toast-in { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } } " +
+        "@keyframes downloader-toast-out { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-10px); opacity: 0; } } ";
+
+    GM_addStyle(css);
 
     const orgFetch = unsafeWindow.fetch;
     unsafeWindow.fetch = async (...args) => {
@@ -311,8 +325,6 @@ function bind() {
         interval_id = undefined;
     }
 
-    addOptionMenu();
-
     const $mainContents = $(mainContentsSelector);
     // model version buttons
     const $modelVersionButtons = $(modelVersionButtonsSelector);
@@ -330,7 +342,24 @@ function bind() {
         }
     });
     interval_id = setInterval(() => {
-        $mainContents.find("a[href^='/api/download/models/']:not(.downloader-binded):not([data-disabled=true])").each((_, link) => {
+        const $downloadButton = $mainContents.find("a[href^='/api/download/models/']").each((_, link) => {
+            const $link = $(link);
+            const $buttonWrapper = $("<div>").css({
+                "display": "flex",
+                "flex-direction": "row",
+            });
+            $buttonWrapper.prependTo($link.parent());
+            $buttonWrapper.append($link);
+
+            const $optionMenu = createOptionMenu();
+            $buttonWrapper.append($optionMenu);
+
+            $optionMenu.closest(".mantine-Card-root").css({
+                "overflow": "visible",
+            });
+        });
+
+        $downloadButton.filter(":not(.downloader-binded):not([data-disabled=true])").each((_, link) => {
             const $link = $(link);
             const dlIcon = $link.find("svg").hasClass("tabler-icon-download");
             const text = $link.text();
@@ -382,47 +411,67 @@ function bind() {
     }, INTERVAL);
 }
 
-function addOptionMenu() {
-    const $header = $("header > div:eq(1) > div:eq(0)");
-    if ($header.length && $header.find(".downloader-options-container").length === 0) {
-        const $container = $('<div class="downloader-options-container" style="position: relative; display: flex; align-items: center;"></div>');
-        const $optBtn = $('<div class="downloader-options-btn" title="Downloader Settings">⚙</div>');
-        const $menu = $('<div class="downloader-options-menu"></div>');
+function createOptionMenu() {
+    const $container = $('<div class="downloader-options-container"></div>');
+    const $optBtn = $('<div class="downloader-options-btn" title="Downloader Settings"></div>');
+    const $settingsIcon = $("<span>")
+        .addClass("material-symbols-outlined settings")
+        .css({
+            "font-size": "24px",
+            "color": "#808080B0",
+        })
+        .text("settings");
+    $optBtn.append($settingsIcon);
+    const $menu = $('<div class="downloader-options-menu"></div>');
 
-        options.forEach((opt) => {
-            const isChecked = getOption(opt.key, opt.default);
-            const $item = $(`<label class="downloader-option-item">`);
-            const $input = $(`<input type="checkbox" data-key="${opt.key}" ${isChecked ? "checked" : ""}>`);
-            const $label = $(`<span>${opt.label}</span>`);
-            $item.append($input).append($label);
-            if (opt.attention) {
-                const $attention = $(`<span style="font-size: 12px; color: #ff922b;" title="${opt.attention}">⚠</span>`);
-                $item.append($attention);
-            }
-            if (opt.help) {
-                const $help = $(`<a href="${opt.help}" target="_blank" rel="noopener noreferrer">[?]</a>`);
-                $item.append($help);
-            }
-            $input.on("change", function () {
-                setOption(opt.key, this.checked);
-            });
-            $menu.append($item);
+    const $tooltip2Icon = $("<span>")
+        .addClass("material-symbols-outlined tooltip_2")
+        .css({
+            "font-size": "18px",
+            "color": "#ff922b",
+        })
+        .text("tooltip_2");
+
+    const $helpIcon = $("<a>")
+        .addClass("material-symbols-outlined help")
+        .css({
+            "font-size": "18px",
+        })
+        .text("help");
+
+    options.forEach((opt) => {
+        const isChecked = getOption(opt.key, opt.default);
+        const $item = $("<label>").addClass("downloader-option-item");
+        const $input = $("<input type='checkbox'>").prop("checked", isChecked).data("key", opt.key);
+        const $label = $("<span>").css({ "display": "flex", "align-items": "center" }).text(opt.label);
+        $item.append($input).append($label);
+        if (opt.attention) {
+            $label.append($tooltip2Icon.clone());
+            $label.attr("title", opt.attention);
+        }
+        if (opt.help) {
+            const $help = $helpIcon.clone().attr({ "href": opt.help, "target": "_blank", "rel": "noopener noreferrer" });
+            $item.append($help);
+        }
+        $input.on("change", function () {
+            setOption(opt.key, this.checked);
         });
+        $menu.append($item);
+    });
 
-        $optBtn.on("click", (e) => {
-            e.stopPropagation();
-            $menu.toggleClass("show");
-        });
+    $optBtn.on("click", (e) => {
+        e.stopPropagation();
+        $menu.toggleClass("show");
+    });
 
-        $(document).on("click", (e) => {
-            if (!$(e.target).closest(".downloader-options-container").length) {
-                $menu.removeClass("show");
-            }
-        });
+    $(document).on("click", (e) => {
+        if (!$(e.target).closest(".downloader-options-container").length) {
+            $menu.removeClass("show");
+        }
+    });
 
-        $container.append($optBtn).append($menu);
-        $header.append($container);
-    }
+    $container.append($optBtn).append($menu);
+    return $container;
 }
 
 function getId() {

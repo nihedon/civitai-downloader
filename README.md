@@ -19,7 +19,7 @@ This is an extension that allows you to download preview images and metadata alo
 
 After installing the extension, access the model page on Civitai. The download button will change to rainbow colors. Click the rainbow download button to download the preview images and metadata along with the model.
 
-A gear icon is displayed on the right side of the header. Clicking this icon will open the settings panel.
+Click the gear icon to open the settings panel.
 The following settings are available:
 
 - **Image File Only**: Downloads only the preview images.
