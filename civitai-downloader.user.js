@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.13
+// @version      1.2.14
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon, abel1502
 // @match        https://civitai.com/*
@@ -97,56 +97,6 @@ const BUTTON_AFTER_STYLE = {
     "background-color": "var(--mrt-row-hover-background-color)",
     "border-radius": "4px",
 };
-const TOAST_CONTAINER_STYLE = {
-    "position": "fixed",
-    "top": "12px",
-    "right": "12px",
-    "display": "flex",
-    "flex-direction": "column",
-    "gap": "8px",
-    "z-index": "2147483647",
-    "pointer-events": "none",
-};
-const TOAST_STYLE = {
-    "min-width": "420px",
-    "max-width": "420px",
-    "color": "#fff",
-    "background": "rgba(80,80,80,0.78)",
-    "backdrop-filter": "blur(6px)",
-    "padding": "10px 12px",
-    "border-radius": "10px",
-    "box-shadow": "0 3px 4px 0px rgba(80,80,80,0.3)",
-    "display": "flex",
-    "align-items": "center",
-    "gap": "10px",
-    "pointer-events": "auto",
-    "font-size": "13px",
-    "line-height": "1.4",
-    "animation": `downloader-toast-in ${TOAST_DEFAULT_EASE_DURATION}ms ease-out`,
-};
-const TOAST_MESSAGE_STYLE = {
-    "margin": 0,
-};
-const TOAST_PROGRESS_ANIMATION_STYLE = {
-    "content": "''",
-    "width": "16px",
-    "height": "16px",
-    "border": "2px solid rgba(255,255,255,0.35)",
-    "border-top-color": "#fff",
-    "border-radius": "50%",
-    "animation": "downloader-spin 1s linear infinite",
-};
-const TOAST_SUCCESS_STYLE = {
-    "background": "rgba(0,128,64,0.78)",
-    "box-shadow": "0 3px 4px 0px rgba(0,128,64,0.3)",
-};
-const TOAST_ERROR_STYLE = {
-    "background": "rgba(180,0,32,0.78)",
-    "box-shadow": "0 3px 4px 0px rgba(180,0,32,0.3)",
-};
-const TOAST_CLOSING_STYLE = {
-    "animation": `downloader-toast-out ${TOAST_DEFAULT_EASE_DURATION}ms ease-in forwards`,
-};
 const OPTIONS_CONTAINER_STYLE = {
     "position": "relative",
     "display": "flex",
@@ -189,48 +139,38 @@ const OPTION_ITEM_STYLE = {
 
 var interval_id = undefined;
 
+const createCssSyntax = (selector, dic) =>
+    `${selector} { ${
+        Object.entries(dic)
+            .flatMap((kv) => kv.join(":"))
+            .join(";") + ";"
+    } }`;
+
+const iconCss = GM_getResourceText("MATERIAL_ICONS");
+GM_addStyle(iconCss.replace("@font-face {", "@font-face { font-display: block;"));
+
+const css =
+    // Download button effects
+    createCssSyntax(".downloader-effect", BUTTON_STYLE) +
+    createCssSyntax(".downloader-effect::before", BUTTON_BEFORE_STYLE) +
+    createCssSyntax(".mantine-Menu-dropdown > .mantine-Menu-item.downloader-effect::before", { "top": "0px" }) +
+    createCssSyntax(".downloader-effect::after", BUTTON_AFTER_STYLE) +
+    createCssSyntax(".downloader-options-container", OPTIONS_CONTAINER_STYLE) +
+    createCssSyntax(".downloader-options-btn", OPTIONS_BTN_STYLE) +
+    createCssSyntax(".downloader-options-btn:hover", { "background-color": "rgba(255,255,255,0.1)" }) +
+    createCssSyntax(".downloader-options-menu", OPTIONS_MENU_STYLE) +
+    createCssSyntax(".downloader-options-menu.show", { "display": "flex" }) +
+    createCssSyntax(".downloader-option-item", OPTION_ITEM_STYLE) +
+    // Prevent layout shift/FOIT for icons
+    ".material-symbols-outlined { font-display: block; width: 1em; overflow: hidden; }" +
+    // Keyframes
+    "@keyframes blink { 0% { opacity: 0; } 100% { opacity: 1; } } " +
+    "@keyframes downloader-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } ";
+
+GM_addStyle(css);
+
 (function () {
     "use strict";
-
-    const iconCss = GM_getResourceText("MATERIAL_ICONS");
-    GM_addStyle(iconCss.replace("@font-face {", "@font-face { font-display: block;"));
-
-    const createCssSyntax = (selector, dic) =>
-        `${selector} { ${
-            Object.entries(dic)
-                .flatMap((kv) => kv.join(":"))
-                .join(";") + ";"
-        } }`;
-
-    const css =
-        // Download button effects
-        createCssSyntax(".downloader-effect", BUTTON_STYLE) +
-        createCssSyntax(".downloader-effect::before", BUTTON_BEFORE_STYLE) +
-        createCssSyntax(".mantine-Menu-dropdown > .mantine-Menu-item.downloader-effect::before", { "top": "0px" }) +
-        createCssSyntax(".downloader-effect::after", BUTTON_AFTER_STYLE) +
-        // Toast container & items
-        createCssSyntax(".downloader-toast-container", TOAST_CONTAINER_STYLE) +
-        createCssSyntax(".downloader-toast", TOAST_STYLE) +
-        createCssSyntax(".downloader-toast-message", TOAST_MESSAGE_STYLE) +
-        createCssSyntax(".downloader-toast.downloader-toast--progress::before", TOAST_PROGRESS_ANIMATION_STYLE) +
-        createCssSyntax(".downloader-toast.downloader-toast--success", TOAST_SUCCESS_STYLE) +
-        createCssSyntax(".downloader-toast.downloader-toast--error", TOAST_ERROR_STYLE) +
-        createCssSyntax(".downloader-toast.downloader-toast--closing", TOAST_CLOSING_STYLE) +
-        createCssSyntax(".downloader-options-container", OPTIONS_CONTAINER_STYLE) +
-        createCssSyntax(".downloader-options-btn", OPTIONS_BTN_STYLE) +
-        createCssSyntax(".downloader-options-btn:hover", { "background-color": "rgba(255,255,255,0.1)" }) +
-        createCssSyntax(".downloader-options-menu", OPTIONS_MENU_STYLE) +
-        createCssSyntax(".downloader-options-menu.show", { "display": "flex" }) +
-        createCssSyntax(".downloader-option-item", OPTION_ITEM_STYLE) +
-        // Prevent layout shift/FOIT for icons
-        ".material-symbols-outlined { font-display: block; width: 1em; overflow: hidden; }" +
-        // Keyframes
-        "@keyframes blink { 0% { opacity: 0; } 100% { opacity: 1; } } " +
-        "@keyframes downloader-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } " +
-        "@keyframes downloader-toast-in { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } } " +
-        "@keyframes downloader-toast-out { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-10px); opacity: 0; } } ";
-
-    GM_addStyle(css);
 
     const orgFetch = unsafeWindow.fetch;
     unsafeWindow.fetch = async (...args) => {
@@ -247,77 +187,6 @@ var interval_id = undefined;
 var mainContentsSelector = "main > div:nth-child(2) > div:nth-child(1) > div:nth-of-type(3) > div:nth-child(1) > div:nth-child(1)";
 
 var modelVersionButtonsSelector = ".mantine-Container-root > .mantine-Stack-root > .mantine-Group-root .mantine-Button-root";
-
-// -------------- Toast Helpers --------------
-let __toastSeq = 0;
-
-function getToastContainer() {
-    let container = document.querySelector(".downloader-toast-container");
-    if (!container) {
-        container = document.createElement("div");
-        container.className = "downloader-toast-container";
-        document.body.appendChild(container);
-    }
-    return container;
-}
-
-function showToast(message, type) {
-    const duration = type === "progress" ? 0 : TOAST_DEFAULT_DURATION;
-    const container = getToastContainer();
-    const toast = document.createElement("div");
-    toast.className = `downloader-toast${type ? " downloader-toast--" + type : ""}`;
-    toast.dataset.toastId = String(++__toastSeq);
-    const toastMessage = document.createElement("p");
-    toastMessage.className = "downloader-toast-message";
-    toastMessage.textContent = message;
-    toast.appendChild(toastMessage);
-    container.prepend(toast);
-    if (duration && duration > 0) {
-        toast.__timer = setTimeout(() => closeToast(toast), duration);
-    }
-    return toast;
-}
-
-function updateToast(toast, message, type) {
-    if (!toast || !toast.isConnected) {
-        return showToast(message, type);
-    }
-    const duration = type === "progress" ? 0 : TOAST_DEFAULT_DURATION;
-    if (typeof message === "string") {
-        const toastMessage = toast.querySelector(".downloader-toast-message");
-        if (toastMessage) {
-            toastMessage.textContent = message;
-        }
-    }
-    if (type) {
-        toast.classList.remove("downloader-toast--info", "downloader-toast--progress", "downloader-toast--success", "downloader-toast--error");
-        toast.classList.add("downloader-toast--" + type);
-    }
-    if (typeof duration === "number") {
-        if (toast.__timer) {
-            clearTimeout(toast.__timer);
-        }
-        if (duration > 0) {
-            toast.__timer = setTimeout(() => closeToast(toast), duration);
-        }
-    }
-    return toast;
-}
-
-function closeToast(toast) {
-    if (!toast || !toast.isConnected) {
-        return;
-    }
-    if (toast.__timer) {
-        clearTimeout(toast.__timer);
-    }
-    toast.classList.add("downloader-toast--closing");
-    setTimeout(() => {
-        if (toast && toast.parentElement) {
-            toast.parentElement.removeChild(toast);
-        }
-    }, TOAST_DEFAULT_DURATION);
-}
 
 function bind() {
     if (interval_id !== undefined) {
@@ -491,7 +360,7 @@ async function getModelId() {
 }
 
 function downloadAll(modelId, modelUrl) {
-    const metaInfoToast = showToast(`Fetching metadata...`, "progress");
+    const metaInfoToast = Toast.showProgress("Fetching metadata...");
     GM_xmlhttpRequest({
         method: "GET",
         url: API_MODEL_VERSIONS + modelId,
@@ -504,41 +373,41 @@ function downloadAll(modelId, modelUrl) {
                 const fileNameBase = modelInfo.name.replace(/\.[^\.]+$/, "");
                 downloadModelFile(modelUrl, fileNameBase, modelInfo.name);
                 downloadMetaFile(json, fileNameBase);
-                updateToast(metaInfoToast, `${fileNameBase}.civitai.info downloaded`, "success");
+                metaInfoToast.showSuccess(`${fileNameBase}.civitai.info downloaded`);
                 downloadImageFile(json, fileNameBase, 0);
                 if (getOption("description_txt", OPT_DESCRIPTION_TXT_DEFAULT) && description) {
                     downloadDescriptionFile(description, fileNameBase);
-                    showToast(`${fileNameBase}.description.txt downloaded`, "success");
+                    Toast.showSuccess(`${fileNameBase}.description.txt downloaded`);
                 }
             } else {
-                updateToast(metaInfoToast, "No downloadable file found.", "info");
+                metaInfoToast.showInfo("No downloadable file found.");
             }
         },
         onerror: function (err) {
             console.error("Model version fetch failed", err);
-            updateToast(metaInfoToast, "Failed to fetch metadata.", "error");
+            metaInfoToast.showError("Failed to fetch metadata.");
         },
     });
 }
 
 function downloadModelFile(modelUrl, fileNameBase, modelFileName) {
-    const modelToast = showToast(`Preparing ${modelFileName}...`, "progress");
+    const modelToast = Toast.showProgress(`Preparing ${modelFileName}...`);
     downloadUrl(modelUrl, fileNameBase, modelFileName, {
         onload: () => {
-            updateToast(modelToast, `${modelFileName} downloaded`, "success");
+            modelToast.showSuccess(`${modelFileName} downloaded`);
         },
         onerror: (err) => {
             console.error("Model download failed", err);
-            updateToast(modelToast, `Failed to fetch ${modelFileName}`, "error");
+            modelToast.showError(`Failed to fetch ${modelFileName}`);
         },
         ontimeout: () => {
-            updateToast(modelToast, `Timed out downloading ${modelFileName}`, "error");
+            modelToast.showError(`Timed out downloading ${modelFileName}`);
         },
     });
 }
 
 function downloadImageFile(modelVersionInfo, fileNameBase, imgIdx) {
-    const previewToast = showToast(`Preparing ${fileNameBase}.preview.png...`, "progress");
+    const previewToast = Toast.showProgress(`Preparing ${fileNameBase}.preview.png...`);
     let imgs = modelVersionInfo.images;
     if (getOption("image_file_only", OPT_IMAGE_FILE_ONLY_DEFAULT)) {
         imgs = imgs.filter((img) => img.type === "image");
@@ -558,15 +427,15 @@ function downloadImageFile(modelVersionInfo, fileNameBase, imgIdx) {
                 const type = img.type === "image" ? `image/${ext}` : `video/${ext}`;
                 const blob = new Blob([res.response], { type: type });
                 downloadBlob(blob, fileNameBase, `${fileNameBase}.preview.${ext}`);
-                updateToast(previewToast, `${fileNameBase}.preview.${ext} downloaded`, "success");
+                previewToast.showSuccess(`${fileNameBase}.preview.${ext} downloaded`);
             },
             onerror: function (err) {
                 console.error("Preview download failed", err);
-                updateToast(previewToast, `Failed to fetch ${fileNameBase}.preview`, "error");
+                previewToast.showError(`Failed to fetch ${fileNameBase}.preview`);
             },
         });
     } else {
-        updateToast(previewToast, `No preview image available`, "info");
+        previewToast.showInfo(`No preview image available`);
     }
 }
 
@@ -626,4 +495,173 @@ function downloadHref(url, fileName, callback = () => {}) {
     $a.get(0).click();
     $a.remove();
     callback();
+}
+
+class Toast {
+    TOAST_DEFAULT_DURATION = 3000; // ms
+
+    _element = document.createElement("div");
+    _messageElement = document.createElement("p");
+
+    _container;
+    _timer = 0;
+
+    static TOAST_CONTAINER_STYLE = {
+        "position": "fixed",
+        "top": "12px",
+        "right": "12px",
+        "display": "flex",
+        "flex-direction": "column",
+        "gap": "8px",
+        "z-index": "2147483647",
+        "pointer-events": "none",
+    };
+    static TOAST_STYLE = {
+        "min-width": "420px",
+        "max-width": "420px",
+        "color": "#fff",
+        "background": "rgba(80,80,80,0.78)",
+        "backdrop-filter": "blur(6px)",
+        "padding": "10px 12px",
+        "border-radius": "10px",
+        "box-shadow": "0 3px 4px 0px rgba(80,80,80,0.3)",
+        "display": "flex",
+        "align-items": "center",
+        "gap": "10px",
+        "pointer-events": "auto",
+        "font-size": "13px",
+        "line-height": "1.4",
+        "animation": `downloader-toast-in ${TOAST_DEFAULT_EASE_DURATION}ms ease-out`,
+    };
+    static TOAST_MESSAGE_STYLE = {
+        "margin": 0,
+    };
+    static TOAST_PROGRESS_ANIMATION_STYLE = {
+        "content": "''",
+        "width": "16px",
+        "height": "16px",
+        "border": "2px solid rgba(255,255,255,0.35)",
+        "border-top-color": "#fff",
+        "border-radius": "50%",
+        "animation": "downloader-spin 1s linear infinite",
+    };
+    static TOAST_SUCCESS_STYLE = {
+        "background": "rgba(0,128,64,0.78)",
+        "box-shadow": "0 3px 4px 0px rgba(0,128,64,0.3)",
+    };
+    static TOAST_ERROR_STYLE = {
+        "background": "rgba(180,0,32,0.78)",
+        "box-shadow": "0 3px 4px 0px rgba(180,0,32,0.3)",
+    };
+    static TOAST_CLOSING_STYLE = {
+        "animation": `downloader-toast-out ${TOAST_DEFAULT_EASE_DURATION}ms ease-in forwards`,
+    };
+
+    static {
+        const css =
+            createCssSyntax(".downloader-toast-container", Toast.TOAST_CONTAINER_STYLE) +
+            createCssSyntax(".downloader-toast", Toast.TOAST_STYLE) +
+            createCssSyntax(".downloader-toast-message", Toast.TOAST_MESSAGE_STYLE) +
+            createCssSyntax(".downloader-toast.downloader-toast--progress::before", Toast.TOAST_PROGRESS_ANIMATION_STYLE) +
+            createCssSyntax(".downloader-toast.downloader-toast--success", Toast.TOAST_SUCCESS_STYLE) +
+            createCssSyntax(".downloader-toast.downloader-toast--error", Toast.TOAST_ERROR_STYLE) +
+            createCssSyntax(".downloader-toast.downloader-toast--closing", Toast.TOAST_CLOSING_STYLE) +
+            "@keyframes downloader-toast-in { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } } " +
+            "@keyframes downloader-toast-out { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-10px); opacity: 0; } } ";
+
+        GM_addStyle(css);
+    }
+
+    constructor() {
+        this._container = document.querySelector(".downloader-toast-container");
+        if (!this._container) {
+            this._container = document.createElement("div");
+            this._container.className = "downloader-toast-container";
+            document.body.appendChild(this._container);
+        }
+        this._element = document.createElement("div");
+        this._element.classList.add("downloader-toast");
+
+        this._messageElement = document.createElement("p");
+        this._messageElement.className = "downloader-toast-message";
+        this._element.appendChild(this._messageElement);
+    }
+
+    static showInfo(message) {
+        const toast = new Toast();
+        toast.showInfo(message);
+        return toast;
+    }
+
+    static showProgress(message) {
+        const toast = new Toast();
+        toast.showProgress(message);
+        return toast;
+    }
+
+    static showSuccess(message) {
+        const toast = new Toast();
+        toast.showSuccess(message);
+        return toast;
+    }
+
+    static showError(message) {
+        const toast = new Toast();
+        toast.showError(message);
+        return toast;
+    }
+
+    showInfo(message) {
+        this.show(message, "info");
+    }
+
+    showProgress(message) {
+        this.show(message, "progress");
+    }
+
+    showSuccess(message) {
+        this.show(message, "success");
+    }
+
+    showError(message) {
+        this.show(message, "error");
+    }
+
+    show(message, toastType) {
+        const duration = this._getDuration(toastType);
+        this._setMessage(message, toastType);
+        if (!this._element.isConnected) {
+            this._container.prepend(this._element);
+        } else if (this._timer) {
+            clearTimeout(this._timer);
+        }
+        if (duration > 0) {
+            this._timer = setTimeout(() => this._close(), duration);
+        }
+    }
+
+    _setMessage(message, toastType) {
+        this._element.classList.remove(...["info", "progress", "success", "error"].map((t) => `downloader-toast--${t}`));
+        this._element.classList.add(`downloader-toast--${toastType}`);
+        this._messageElement.textContent = message;
+    }
+
+    _getDuration(toastType) {
+        return toastType === "progress" ? 0 : this.TOAST_DEFAULT_DURATION;
+    }
+
+    _close() {
+        if (!this._element.isConnected) {
+            return;
+        }
+        if (this._timer) {
+            clearTimeout(this._timer);
+        }
+        this._element.classList.add("downloader-toast--closing");
+        setTimeout(() => {
+            if (this._element?.parentElement) {
+                this._element.remove();
+            }
+        }, this.TOAST_DEFAULT_DURATION);
+    }
 }
