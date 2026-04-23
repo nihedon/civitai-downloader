@@ -2,7 +2,7 @@
 
 # Civitai Downloader
 
-![image](https://github.com/user-attachments/assets/a91e16d0-97ad-4d89-943c-247145ed474b)
+![image](https://github.com/user-attachments/assets/bfc63e1e-1bc4-421d-8955-335b59b0436e)
 
 ## Overview
 
