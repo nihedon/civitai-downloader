@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.15
+// @version      1.2.16
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon, abel1502
 // @match        https://civitai.com/*
@@ -211,22 +211,25 @@ function bind() {
         }
     });
     intervalId = setInterval(() => {
-        const $downloadButton = $mainContents.find("a[href^='/api/download/models/']").each((_, link) => {
-            const $link = $(link);
-            const $buttonWrapper = $("<div>").css({
-                "display": "flex",
-                "flex-direction": "row",
-            });
-            $buttonWrapper.prependTo($link.parent());
-            $buttonWrapper.append($link);
+        const $downloadButton = $mainContents.find("a[href^='/api/download/models/']");
+        if (!$downloadButton.parent().is(".download-button-container")) {
+            $downloadButton.each((_, link) => {
+                const $link = $(link);
+                const $buttonWrapper = $("<div>").css({
+                    "display": "flex",
+                    "flex-direction": "row",
+                }).addClass("download-button-container");
+                $buttonWrapper.prependTo($link.parent());
+                $buttonWrapper.append($link);
 
-            const $optionMenu = createOptionMenu();
-            $buttonWrapper.append($optionMenu);
+                const $optionMenu = createOptionMenu();
+                $buttonWrapper.append($optionMenu);
 
-            $optionMenu.closest(".mantine-Card-root").css({
-                "overflow": "visible",
+                $optionMenu.closest(".mantine-Card-root").css({
+                    "overflow": "visible",
+                });
             });
-        });
+        }
 
         $downloadButton.filter(":not(.downloader-binded):not([data-disabled=true])").each((_, link) => {
             const $link = $(link);
