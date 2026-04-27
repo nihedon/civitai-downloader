@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.16
+// @version      1.2.17
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon, abel1502
 // @match        https://civitai.com/*
@@ -86,6 +86,9 @@ const BUTTON_BEFORE_STYLE = {
     "filter": "blur(4px)",
     "animation": "3s alternate-reverse infinite ease blink",
 };
+const BUTTON_OPTIONAL_BEFORE_STYLE = {
+    "top": "0",
+};
 const BUTTON_AFTER_STYLE = {
     "content": "''",
     "position": "absolute",
@@ -153,6 +156,7 @@ const css =
     // Download button effects
     createCssSyntax(".downloader-effect", BUTTON_STYLE) +
     createCssSyntax(".downloader-effect::before", BUTTON_BEFORE_STYLE) +
+    createCssSyntax(".downloader-effect-optional::before", BUTTON_OPTIONAL_BEFORE_STYLE) +
     createCssSyntax(".mantine-Menu-dropdown > .mantine-Menu-item.downloader-effect::before", { "top": "0px" }) +
     createCssSyntax(".downloader-effect::after", BUTTON_AFTER_STYLE) +
     createCssSyntax(".downloader-options-container", OPTIONS_CONTAINER_STYLE) +
@@ -213,14 +217,19 @@ function bind() {
     intervalId = setInterval(() => {
         const $downloadButton = $mainContents.find("a[href^='/api/download/models/']");
         if (!$downloadButton.parent().is(".download-button-container")) {
-            $downloadButton.each((_, link) => {
-                const $link = $(link);
-                const $buttonWrapper = $("<div>").css({
-                    "display": "flex",
-                    "flex-direction": "row",
-                }).addClass("download-button-container");
-                $buttonWrapper.prependTo($link.parent());
-                $buttonWrapper.append($link);
+            $downloadButton.each((_, button) => {
+                const $button = $(button);
+                if ($button.closest(".mantine-Accordion-content").length) {
+                    return;
+                }
+                const $buttonWrapper = $("<div>")
+                    .css({
+                        "display": "flex",
+                        "flex-direction": "row",
+                    })
+                    .addClass("download-button-container");
+                $buttonWrapper.prependTo($button.parent());
+                $buttonWrapper.append($button);
 
                 const $optionMenu = createOptionMenu();
                 $buttonWrapper.append($optionMenu);
@@ -230,6 +239,13 @@ function bind() {
                 });
             });
         }
+
+        $downloadButton.each((_, button) => {
+            const $button = $(button);
+            if ($button.closest(".mantine-Accordion-content").length) {
+                $button.addClass("downloader-effect-optional");
+            }
+        });
 
         $downloadButton.filter(":not(.downloader-binded):not([data-disabled=true])").each((_, link) => {
             const $link = $(link);
