@@ -9,7 +9,7 @@
 2. Scroll down to the `Downloads BETA` section.
 3. Change ② `Download Mode` to `Browser API`.
 4. Add the following line to the end of ③ `Whitelisted File Extensions`:
-   `/\.(info|pt|ckpt|safetensors)$/`
+   `/\.(info|pt|ckpt|safetensors|gguf|zip)$/`
 5. Click the ④ `Save` button.
 6. Click the ⑤ `OK` button when the confirmation dialog appears.
 7. Click ⑥ `Allow` to grant the necessary permissions.
