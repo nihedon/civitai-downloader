@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Civitai downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.18
+// @version      1.2.19
 // @description  This extension is designed to automatically download Civitai models with their preview images and metadata (JSON).
 // @author       nihedon, abel1502
 // @match        https://civitai.com/*
@@ -178,7 +178,7 @@ GM_addStyle(css);
 
     const orgFetch = unsafeWindow.fetch;
     unsafeWindow.fetch = async (...args) => {
-        if (args && args.length > 0 && args[0].startsWith("/api/trpc/track.addView")) {
+        if (args && args.length > 0 && args[0].startsWith("/api/track/view")) {
             bind();
         }
         return orgFetch(...args);
